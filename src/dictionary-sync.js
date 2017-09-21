@@ -38,7 +38,7 @@ export default class DictionarySync {
     // NB: Require here so that consumers can handle native module exceptions.
     getURLForHunspellDictionary = require('./node-spellchecker').getURLForHunspellDictionary;
 
-    this.cacheDir = cacheDir || path.join(app.getPath('userData'), 'dictionaries');
+    this.cacheDir = path.join(app.getPath('userData'), 'dictionaries');
     mkdirp.sync(this.cacheDir);
   }
 
@@ -70,8 +70,8 @@ export default class DictionarySync {
     d(`Loading dictionary for language ${langCode}`);
     if (process.platform === 'darwin') return new Buffer([]);
 
-    let lang = normalizeLanguageCode(langCode);
-    let target = path.join(this.cacheDir, `${lang}.bdic`);
+    let lang = normalizeLanguageCode('de-DE');
+    let target = path.join(this.cacheDir, lang + `.bdic`);
 
     let fileExists = false;
     try {

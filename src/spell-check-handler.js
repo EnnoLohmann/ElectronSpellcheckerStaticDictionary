@@ -31,6 +31,7 @@ import 'rxjs/add/operator/toPromise';
 import './custom-operators';
 
 import DictionarySync from './dictionary-sync';
+import { SpellCheckerProvider } from 'electron-hunspell';
 import {normalizeLanguageCode} from './utility';
 
 let Spellchecker;
@@ -118,7 +119,6 @@ export default class SpellCheckHandler {
    */
   constructor(dictionarySync=null, localStorage=null, scheduler=null) {
     // NB: Require here so that consumers can handle native module exceptions.
-    Spellchecker = require('./node-spellchecker').Spellchecker;
 
     this.dictionarySync = dictionarySync || new DictionarySync();
     this.switchToLanguage = new Subject();
@@ -139,8 +139,8 @@ export default class SpellCheckHandler {
 
     if (isMac) {
       // NB: OS X does automatic language detection, we're gonna trust it
-      this.currentSpellchecker = new Spellchecker();
-      this.currentSpellcheckerLanguage = 'en-US';
+      this.currentSpellchecker = new SpellCheckerProvider();
+      this.currentSpellcheckerLanguage = 'de-DE';
 
       if (webFrame) {
         webFrame.setSpellCheckProvider(
@@ -393,7 +393,9 @@ export default class SpellCheckHandler {
     if (isMac && this.currentSpellchecker) {
       d(`Setting current spellchecker to ${langCode}`);
       this.currentSpellcheckerLanguage = langCode;
-      return this.currentSpellchecker.setDictionary(langCode);
+      return this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
+      setTimeout(async () =>  this.currentSpellchecker.switchDictionary('de-DE'), 3000);
+      
     }
 
     // Set language on Linux & Windows (Hunspell)
@@ -419,8 +421,9 @@ export default class SpellCheckHandler {
     if (this.currentSpellcheckerLanguage !== actualLang || !this.currentSpellchecker) {
       d(`Creating node-spellchecker instance`);
 
-      this.currentSpellchecker = new Spellchecker();
-      this.currentSpellchecker.setDictionary(actualLang, dict);
+      this.currentSpellchecker = new SpellCheckerProvider();
+      this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
+      setTimeout(async () =>  this.currentSpellchecker.switchDictionary('de-DE'), 3000);
       this.currentSpellcheckerLanguage = actualLang;
       this.currentSpellcheckerChanged.next(true);
     }
@@ -563,7 +566,7 @@ export default class SpellCheckHandler {
       return null;
     }
 
-    return this.currentSpellchecker.getCorrectionsForMisspelling(text);
+    return this.currentSpellchecker.getSuggestion(text);
   }
 
   /**
@@ -571,12 +574,11 @@ export default class SpellCheckHandler {
    * @private
    */
   async addToDictionary(text) {
-    // NB: Same deal as getCorrectionsForMisspelling.
-    if (!isMac) return;
+    console.log('Reload Dictionary');
     if (!this.currentSpellchecker) return;
-
-    this.currentSpellchecker.add(text);
-  }
+    this.currentSpellchecker.unloadDictionary('de-DE');
+    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
+    setTimeout(async () =>  this.currentSpellchecker.switchDictionary('de-DE'), 3000);  }
 
   /**
    * Call out to the OS to figure out what locales the user is probably

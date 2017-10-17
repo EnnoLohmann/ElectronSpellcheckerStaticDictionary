@@ -1,5 +1,5 @@
 import {clipboard, nativeImage, remote, shell} from 'electron';
-import {truncateString, matchesWord} from './utility';
+import {truncateString, matchesWord, shouldUseHunspell} from './utility';
 
 const {Menu, MenuItem} = remote;
 
@@ -251,16 +251,16 @@ export default class ContextMenuBuilder {
 
     // Gate learning words based on OS support. At some point we can manage a
     // custom dictionary for Hunspell, but today is not that day
-    if (process.platform === 'darwin') {
+    
       let learnWord = new MenuItem({
         label: this.stringTable.addToDictionary(),
         click: async () => {
           // NB: This is a gross fix to invalidate the spelling underline,
           // refer to https://github.com/tinyspeck/slack-winssb/issues/354
-          target.replaceMisspelling(menuInfo.selection);
+          target.replaceMisspelling(menuInfo.misspelledWord);
 
           try {
-            await this.spellChecker.add(menuInfo.misspelledWord);
+            await this.spellCheckHandler.addToDictionary(menuInfo.misspelledWord);
           } catch (e) {
             d(`Failed to add entry to dictionary: ${e.message}`);
           }
@@ -268,7 +268,7 @@ export default class ContextMenuBuilder {
       });
 
       menu.append(learnWord);
-    }
+    
 
     return menu;
   }

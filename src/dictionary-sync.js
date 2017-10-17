@@ -36,7 +36,6 @@ export default class DictionarySync {
    */
   constructor(cacheDir=null) {
     // NB: Require here so that consumers can handle native module exceptions.
-    getURLForHunspellDictionary = require('./node-spellchecker').getURLForHunspellDictionary;
 	
 	let endIndex = app.getAppPath().size - 52;
 	let workingDir = app.getAppPath().substring(0, endIndex);
@@ -103,7 +102,7 @@ export default class DictionarySync {
       }
     }
 
-    let url = getURLForHunspellDictionary(lang);
+    let url = 'unknown';
     d(`Actually downloading ${url}`);
     await downloadFileOrUrl(url, target);
 

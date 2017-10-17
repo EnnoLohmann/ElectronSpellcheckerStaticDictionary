@@ -577,6 +577,9 @@ export default class SpellCheckHandler {
     console.log('Reload Dictionary');
     if (!this.currentSpellchecker) return;
     this.currentSpellchecker.unloadDictionary('de-DE');
+    var fs = require('fs');
+    fs.appendFileSync('./de-DE.dic', '\n' + text);
+
     this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
     setTimeout(async () =>  this.currentSpellchecker.switchDictionary('de-DE'), 3000);  }
 

@@ -37,7 +37,6 @@ let Spellchecker;
 
 let d = require('debug')('electron-spellchecker:spell-check-handler');
 
-const cld = requireTaskPool(require.resolve('./cld2'));
 let fallbackLocaleTable = null;
 let webFrame = (process.type === 'renderer' ?
   require('electron').webFrame :
@@ -155,11 +154,6 @@ export default class SpellCheckHandler {
    *                            things that this method registered.
    */
   attachToInput(inputText = null) {
-    // OS X has no need for any of this
-    if (isMac && !inputText) {
-      return Subscription.EMPTY;
-    }
-
     let possiblySwitchedCharacterSets = new Subject();
     let wordsTyped = 0;
 
@@ -316,8 +310,9 @@ export default class SpellCheckHandler {
   }
 
   /**
-   * A proxy for the current spellchecker's method of the same name
-   * @private
+   * To add a Word to the Dictionary the .dic will be changed.
+   * The Word is added to the file and then the changed dictionary is loaded
+   * into the checker.
    */
   async addToDictionary(text) {
     console.log('Reload Dictionary');

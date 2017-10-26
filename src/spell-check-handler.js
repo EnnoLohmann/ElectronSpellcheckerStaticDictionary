@@ -34,7 +34,7 @@ import { SpellCheckerProvider } from 'electron-hunspell';
 import { normalizeLanguageCode } from './utility';
 
 let Spellchecker;
-
+let concatenate = require('concatenate');
 let d = require('debug')('electron-spellchecker:spell-check-handler');
 
 let fallbackLocaleTable = null;
@@ -231,7 +231,8 @@ export default class SpellCheckHandler {
     this.isMisspelledCache.reset();
 
     this.currentSpellchecker = new SpellCheckerProvider();
-    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
+    concatenate.sync(['./de-DE.dic', './de-DE.dic-diff'], './de-DE.dic-complete');    
+    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic-complete', './de-DE.aff');
     setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
     this.currentSpellcheckerLanguage = actualLang;
     this.currentSpellcheckerChanged.next(true);
@@ -319,9 +320,9 @@ export default class SpellCheckHandler {
     if (!this.currentSpellchecker) return;
     this.currentSpellchecker.unloadDictionary('de-DE');
     var fs = require('fs');
-    fs.appendFileSync('./de-DE.dic', '\n' + text);
-
-    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
+    fs.appendFileSync('./de-DE.dic-diff', '\n' + text);
+    concatenate.sync(['./de-DE.dic', './de-DE.dic-diff'], './de-DE.dic-complete');
+    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic-complete', './de-DE.aff');
     setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
   }
 }

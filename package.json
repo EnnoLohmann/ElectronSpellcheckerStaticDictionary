@@ -32,6 +32,7 @@
     "@paulcbetts/cld": "^2.4.6",
     "@paulcbetts/spellchecker": "^4.0.5",
     "bcp47": "^1.1.2",
+    "concatenate": "^0.0.2",
     "debug": "^2.6.3",
     "electron-hunspell": "^0.0.3",
     "electron-remote": "^1.1.1",

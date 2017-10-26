@@ -1,6 +1,5 @@
 import ContextMenuBuilder from './context-menu-builder';
 import ContextMenuListener from './context-menu-listener';
-import DictionarySync from './dictionary-sync';
 import SpellCheckHandler from './spell-check-handler';
 
 /**
@@ -11,7 +10,7 @@ import SpellCheckHandler from './spell-check-handler';
  *                          information to.
  */
 function setGlobalLogger(fn) {
-  for (let klass of [ContextMenuBuilder, ContextMenuListener, DictionarySync, SpellCheckHandler]) {
+  for (let klass of [ContextMenuBuilder, ContextMenuListener, SpellCheckHandler]) {
     klass.setLogger(fn);
   }
 }
@@ -19,7 +18,6 @@ function setGlobalLogger(fn) {
 module.exports = {
   ContextMenuBuilder,
   ContextMenuListener,
-  DictionarySync,
   SpellCheckHandler,
   setGlobalLogger,
 };

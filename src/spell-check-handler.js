@@ -30,7 +30,6 @@ import 'rxjs/add/operator/toPromise';
 
 import './custom-operators';
 
-import DictionarySync from './dictionary-sync';
 import { SpellCheckerProvider } from 'electron-hunspell';
 import { normalizeLanguageCode } from './utility';
 
@@ -88,16 +87,11 @@ function fromEventCapture(element, name) {
 export default class SpellCheckHandler {
   /**
    * Constructs a SpellCheckHandler
-   *
-   * @param  {DictionarySync} dictionarySync  An instance of {{DictionarySync}},
-   *                                          create a custom one if you want
-   *                                          to override the dictionary cache
-   *                                          location.
    * @param  {LocalStorage} localStorage      Deprecated.
    * @param  {Scheduler} scheduler            The Rx scheduler to use, for
    *                                          testing.
    */
-  constructor(dictionarySync = null, localStorage = null, scheduler = null) {
+  constructor(localStorage = null, scheduler = null) {
     // NB: Require here so that consumers can handle native module exceptions.
 
     this.switchToLanguage = new Subject();
@@ -129,10 +123,6 @@ export default class SpellCheckHandler {
       return;
     }
   }
-
-  /**
-
-
 
   /**
    * Disconnect the events that we connected in {{attachToInput}} or other places

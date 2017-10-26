@@ -311,30 +311,6 @@ export default class SpellCheckHandler {
   }
 
   /**
-   * Calls out to cld2 to detect the language of the given text
-   * @private
-   */
-  detectLanguageForText(text) {
-    return new Promise((res, rej) => {
-      setTimeout(() => cld.detect(text).then(res, rej), 10);
-    });
-  }
-
-  /**
-   * Returns the locale for a language code based on the user's machine (i.e.
-   * 'en' => 'en-GB')
-   */
-  async getLikelyLocaleForLanguage(language) {
-    let lang = language.toLowerCase();
-    if (!this.likelyLocaleTable) this.likelyLocaleTable = await this.buildLikelyLocaleTable();
-
-    if (this.likelyLocaleTable[lang]) return this.likelyLocaleTable[lang];
-    this.fallbackLocaleTable = this.fallbackLocaleTable || require('./fallback-locales');
-
-    return this.fallbackLocaleTable[lang];
-  }
-
-  /**
    * A proxy for the current spellchecker's method of the same name
    * @private
    */
@@ -362,81 +338,5 @@ export default class SpellCheckHandler {
 
     this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
     setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
-  }
-
-  /**
-   * Call out to the OS to figure out what locales the user is probably
-   * interested in then save it off as a table.
-   * @private
-   */
-  async buildLikelyLocaleTable() {
-    let localeList = [];
-
-    if (process.platform === 'linux') {
-      let locales = await spawn('locale', ['-a'])
-        .catch(() => Observable.of(null))
-        .reduce((acc, x) => { acc.push(...x.split('\n')); return acc; }, [])
-        .toPromise();
-
-      d(`Raw Locale list: ${JSON.stringify(locales)}`);
-
-      localeList = locales.reduce((acc, x) => {
-        let m = x.match(validLangCodeWindowsLinux);
-        if (!m) return acc;
-
-        acc.push(m[0]);
-        return acc;
-      }, []);
-    }
-
-    if (process.platform === 'win32') {
-      localeList = require('keyboard-layout').getInstalledKeyboardLanguages();
-    }
-
-    if (isMac) {
-      fallbackLocaleTable = fallbackLocaleTable || require('./fallback-locales');
-
-      // NB: OS X will return lists that are half just a language, half
-      // language + locale, like ['en', 'pt_BR', 'ko']
-      localeList = this.currentSpellchecker.getAvailableDictionaries()
-        .map((x => {
-          if (x.length === 2) return fallbackLocaleTable[x];
-          return normalizeLanguageCode(x);
-        }));
-    }
-
-    d(`Filtered Locale list: ${JSON.stringify(localeList)}`);
-
-    // Some distros like Ubuntu make locale -a useless by dumping
-    // every possible locale for the language into the list :-/
-    let counts = localeList.reduce((acc, x) => {
-      let k = x.split(/[-_\.]/)[0];
-      acc[k] = acc[k] || [];
-      acc[k].push(x);
-
-      return acc;
-    }, {});
-
-    d(`Counts: ${JSON.stringify(counts)}`);
-
-    let ret = Object.keys(counts).reduce((acc, x) => {
-      if (counts[x].length > 1) return acc;
-
-      d(`Setting ${x}`);
-      acc[x] = normalizeLanguageCode(counts[x][0]);
-
-      return acc;
-    }, {});
-
-    // NB: LANG has a Special Place In Our Hearts
-    if (process.platform === 'linux' && process.env.LANG) {
-      let m = process.env.LANG.match(validLangCodeWindowsLinux);
-      if (!m) return ret;
-
-      ret[m[0].split(/[-_\.]/)[0]] = normalizeLanguageCode(m[0]);
-    }
-
-    d(`Result: ${JSON.stringify(ret)}`);
-    return ret;
   }
 }

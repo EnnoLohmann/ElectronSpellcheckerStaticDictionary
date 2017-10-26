@@ -50,26 +50,6 @@ const validLangCodeWindowsLinux = /[a-z]{2}[_][A-Z]{2}/;
 
 const isMac = process.platform === 'darwin';
 
-// NB: This is to work around electron/electron#1005, where contractions
-// are incorrectly marked as spelling errors. This lets people get away with
-// incorrectly spelled contracted words, but it's the best we can do for now.
-const contractions = [
-  "ain't", "aren't", "can't", "could've", "couldn't", "couldn't've", "didn't", "doesn't", "don't", "hadn't",
-  "hadn't've", "hasn't", "haven't", "he'd", "he'd've", "he'll", "he's", "how'd", "how'll", "how's", "I'd",
-  "I'd've", "I'll", "I'm", "I've", "isn't", "it'd", "it'd've", "it'll", "it's", "let's", "ma'am", "mightn't",
-  "mightn't've", "might've", "mustn't", "must've", "needn't", "not've", "o'clock", "shan't", "she'd", "she'd've",
-  "she'll", "she's", "should've", "shouldn't", "shouldn't've", "that'll", "that's", "there'd", "there'd've",
-  "there're", "there's", "they'd", "they'd've", "they'll", "they're", "they've", "wasn't", "we'd", "we'd've",
-  "we'll", "we're", "we've", "weren't", "what'll", "what're", "what's", "what've", "when's", "where'd",
-  "where's", "where've", "who'd", "who'll", "who're", "who's", "who've", "why'll", "why're", "why's", "won't",
-  "would've", "wouldn't", "wouldn't've", "y'all", "y'all'd've", "you'd", "you'd've", "you'll", "you're", "you've"
-];
-
-const contractionMap = contractions.reduce((acc, word) => {
-  acc[word.replace(/'.*/, '')] = true;
-  return acc;
-}, {});
-
 const alternatesTable = {};
 
 /**
@@ -132,7 +112,6 @@ export default class SpellCheckHandler {
 
     this.scheduler = scheduler;
     this.shouldAutoCorrect = true;
-    this._automaticallyIdentifyLanguages = true;
 
     this.disp = new SerialSubscription();
 
@@ -152,28 +131,8 @@ export default class SpellCheckHandler {
   }
 
   /**
-   * Is the spellchecker trying to detect the typed language automatically?
-   */
-  get automaticallyIdentifyLanguages() {
-    return this._automaticallyIdentifyLanguages;
-  }
 
-  /**
-   * Is the spellchecker trying to detect the typed language automatically?
-   */
-  set automaticallyIdentifyLanguages(value) {
-    this._automaticallyIdentifyLanguages = !!value;
 
-    // Calling `setDictionary` on the macOS implementation of `@paulcbetts/spellchecker`
-    // is the only way to set the `automaticallyIdentifyLanguages` property on the
-    // native NSSpellchecker. Calling switchLanguage with a language will set it `false`,
-    // while calling it with an empty language will set it to `true`
-    if (isMac && !!value) {
-      this.switchLanguage();
-    } else if (isMac && !!value && this.currentSpellcheckerLanguage) {
-      this.switchLanguage(this.currentSpellcheckerLanguage);
-    }
-  }
 
   /**
    * Disconnect the events that we connected in {{attachToInput}} or other places
@@ -232,87 +191,6 @@ export default class SpellCheckHandler {
 
         return Observable.of(e.target.value);
       }));
-
-    let disp = new Subscription();
-
-    // NB: When users switch character sets (i.e. we're checking in English and
-    // the user suddenly starts typing in Russian), the spellchecker will no
-    // longer invoke us, so we don't have a chance to re-detect the language.
-    //
-    // If we see too many words typed without a spelling detection, we know we
-    // should start rechecking the input box for a language change.
-    disp.add(Observable.merge(this.spellCheckInvoked, this.currentSpellcheckerChanged)
-      .subscribe(() => wordsTyped = 0));
-
-    let lastInputText = '';
-    disp.add(input.subscribe((x) => lastInputText = x));
-
-    let initialInputText = input
-      .guaranteedThrottle(250, this.scheduler)
-      .takeUntil(this.currentSpellcheckerChanged);
-
-    if (this.currentSpellcheckerLanguage) {
-      initialInputText = Observable.empty();
-    }
-
-    let contentToCheck = Observable.merge(
-      this.spellingErrorOccurred,
-      initialInputText,
-      possiblySwitchedCharacterSets)
-      .mergeMap(() => {
-        if (lastInputText.length < 8) return Observable.empty();
-        return Observable.of(lastInputText);
-      });
-
-    let languageDetectionMatches = contentToCheck
-      .filter(() => this.automaticallyIdentifyLanguages)
-      .mergeMap((text) => {
-        d(`Attempting detection, string length: ${text.length}`);
-        if (text.length > 256) {
-          text = text.substr(text.length - 256);
-        }
-
-        return Observable.fromPromise(this.detectLanguageForText(text))
-          .catch(() => Observable.empty());
-      });
-
-    disp.add(languageDetectionMatches
-      .mergeMap(async (langWithoutLocale) => {
-        d(`Auto-detected language as ${langWithoutLocale}`);
-        let lang = await this.getLikelyLocaleForLanguage(langWithoutLocale);
-        if (lang !== this.currentSpellcheckerLanguage) await this.switchLanguage(lang);
-
-        return lang;
-      })
-      .catch((e) => {
-        d(`Failed to load dictionary: ${e.message}`);
-        return Observable.empty();
-      })
-      .subscribe(async (lang) => {
-        d(`New Language is ${lang}`);
-      }));
-
-    if (webFrame) {
-      let prevSpellCheckLanguage;
-
-      disp.add(this.currentSpellcheckerChanged
-        .startWith(true)
-        .filter(() => this.currentSpellcheckerLanguage)
-        .subscribe(() => {
-          if (prevSpellCheckLanguage === this.currentSpellcheckerLanguage) return;
-
-          d('Actually installing spell check provider to Electron');
-          webFrame.setSpellCheckProvider(
-            this.currentSpellcheckerLanguage,
-            this.shouldAutoCorrect,
-            { spellCheck: this.handleElectronSpellCheck.bind(this) });
-
-          prevSpellCheckLanguage = this.currentSpellcheckerLanguage;
-        }));
-    }
-
-    this.disp.add(disp);
-    return disp;
   }
 
   /**
@@ -370,7 +248,7 @@ export default class SpellCheckHandler {
 
     this.currentSpellchecker = new SpellCheckerProvider();
     this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
-    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 300);
+    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
     this.currentSpellcheckerLanguage = actualLang;
     this.currentSpellcheckerChanged.next(true);
 
@@ -385,12 +263,7 @@ export default class SpellCheckHandler {
   handleElectronSpellCheck(text) {
     if (!this.currentSpellchecker) return true;
 
-    if (isMac) {
-      return !this.isMisspelled(text);
-    }
-
     this.spellCheckInvoked.next(true);
-
     let result = this.isMisspelled(text);
     if (result) this.spellingErrorOccurred.next(text);
     return !result;
@@ -414,10 +287,6 @@ export default class SpellCheckHandler {
       }
 
       if (!this.currentSpellchecker) return false;
-
-      if (isMac) {
-        return this.currentSpellchecker.isMisspelled(text);
-      }
 
       // NB: I'm not smart enough to fix this bug in Chromium's version of
       // Hunspell so I'm going to fix it here instead. Chromium Hunspell for
@@ -492,7 +361,7 @@ export default class SpellCheckHandler {
     fs.appendFileSync('./de-DE.dic', '\n' + text);
 
     this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic', './de-DE.aff');
-    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 3000);
+    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
   }
 
   /**

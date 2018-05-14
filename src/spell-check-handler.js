@@ -1,4 +1,3 @@
-import { spawn } from 'spawn-rx';
 import { requireTaskPool } from 'electron-remote';
 import LRU from 'lru-cache';
 
@@ -49,6 +48,8 @@ const validLangCodeWindowsLinux = /[a-z]{2}[_][A-Z]{2}/;
 const isMac = process.platform === 'darwin';
 
 const alternatesTable = {};
+
+const dictionaryPath = './assets/dictionaries/';
 
 /**
  * This method mimics Observable.fromEvent, but with capture semantics.
@@ -211,8 +212,6 @@ export default class SpellCheckHandler {
     return ret;
   }
 
-
-
   /**
    * Explicitly switch the language to a specific language. This method will
    * automatically download the dictionary for the specific language and locale
@@ -224,19 +223,17 @@ export default class SpellCheckHandler {
    * @return {Promise}            Completion
    */
   async switchLanguage(langCode) {
-    let actualLang;
     let dict = null;
 
     // Set language on Linux & Windows (Hunspell)
     this.isMisspelledCache.reset();
 
     this.currentSpellchecker = new SpellCheckerProvider();
-    concatenate.sync(['./de-DE.dic', './de-DE.dic-diff'], './de-DE.dic-complete');    
-    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic-complete', './de-DE.aff');
-    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
-    this.currentSpellcheckerLanguage = actualLang;
+    concatenate.sync([dictionaryPath + langCode + '.dic', dictionaryPath + langCode + '.dic-diff'], dictionaryPath + langCode + '.dic-complete');
+    this.currentSpellchecker.loadDictionary(langCode, dictionaryPath + langCode + '.dic-complete', dictionaryPath + langCode + '.aff');
+    setTimeout(async () => this.currentSpellchecker.switchDictionary(langCode), 1000);
+    this.currentSpellcheckerLanguage = langCode;
     this.currentSpellcheckerChanged.next(true);
-
   }
 
 
@@ -316,13 +313,12 @@ export default class SpellCheckHandler {
    * into the checker.
    */
   async addToDictionary(text) {
-    console.log('Reload Dictionary');
     if (!this.currentSpellchecker) return;
-    this.currentSpellchecker.unloadDictionary('de-DE');
+    this.currentSpellchecker.unloadDictionary(this.currentSpellcheckerLanguage);
     var fs = require('fs');
-    fs.appendFileSync('./de-DE.dic-diff', '\n' + text);
-    concatenate.sync(['./de-DE.dic', './de-DE.dic-diff'], './de-DE.dic-complete');
-    this.currentSpellchecker.loadDictionary('de-DE', './de-DE.dic-complete', './de-DE.aff');
-    setTimeout(async () => this.currentSpellchecker.switchDictionary('de-DE'), 1000);
+    fs.appendFileSync(dictionaryPath + this.currentSpellcheckerLanguage + '.dic-diff', '\n' + text);
+    concatenate.sync([dictionaryPath + this.currentSpellcheckerLanguage + '.dic', dictionaryPath + this.currentSpellcheckerLanguage + '.dic-diff'], dictionaryPath + this.currentSpellcheckerLanguage + '.dic-complete');
+    this.currentSpellchecker.loadDictionary(this.currentSpellcheckerLanguage, dictionaryPath + this.currentSpellcheckerLanguage + '.dic-complete', dictionaryPath + this.currentSpellcheckerLanguage + '.aff');
+    setTimeout(async () => this.currentSpellchecker.switchDictionary(this.currentSpellcheckerLanguage), 1000);
   }
 }
